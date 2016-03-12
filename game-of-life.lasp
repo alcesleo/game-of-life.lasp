@@ -1,0 +1,136 @@
+
+; --- Generate world ---
+(defn random-cell ()
+  (> 0.5 (.rand Kernel)))
+
+(defn random-row*
+  (remaining-cells row)
+  (if (zero? remaining-cells)
+    row
+    (random-row* (dec remaining-cells) (cons (random-cell) row))))
+
+(defn random-row
+  (length)
+  (random-row* length (list)))
+
+(defn print-row
+  (row)
+  (let (cells (map
+                (fn (cell) (if cell :o :.))
+                row))
+    (println (.join cells " "))))
+
+(defn random-world*
+  (size remaining-rows world)
+  (if (zero? remaining-rows)
+    world
+    (random-world* size (dec remaining-rows) (cons (random-row size) world))))
+
+(defn random-world
+  (size)
+  (random-world* size size (list)))
+
+; --- Display ---
+
+(defn print-world
+  (world)
+  (map print-row world)
+  (println))
+
+(defn sleep ()
+  (.sleep Kernel 1))
+
+(defn clear ()
+  (.system Kernel "clear"))
+
+(defn tick ()
+  (sleep)
+  (clear))
+
+
+
+; --- Find neighbours ---
+
+(def relative-neighbour-indices
+  (list
+    '(-1 -1) '(-1 0) '(-1 1)
+    '(0 -1)          '(0 1)
+    '(1 -1)  '(1 0)  '(1 1)))
+
+; TODO Refactor
+(defn within-bounds?
+  (row-col size)
+  (let (row (first row-col)
+        col (second row-col))
+    (and
+      (>= row 0)
+      (>= col 0)
+      (< row size)
+      (< col size))))
+
+(defn neighbour-indices
+  (row col)
+  (map
+    (fn (relative-row-col)
+      (let (rrow (first relative-row-col)
+            rcol (second relative-row-col))
+        (list (+ row rrow) (+ col rcol))))
+    relative-neighbour-indices))
+
+(defn bounded-neighbour-indices
+  (row col size)
+  (filter
+    (fn (row-col) (within-bounds? row-col size))
+    (neighbour-indices row col)))
+
+(defn get-cell
+  (world row col)
+  ((world row) col))
+
+(defn count-truthy
+  (coll)
+  (sum
+    (map (fn (item) (if item 1 0))
+         coll)))
+
+(defn num-living-neighbours
+  (row col world size)
+  (let (get-cell (fn (row-col) (get-cell world (first row-col) (second row-col))))
+    (count-truthy (map get-cell (bounded-neighbour-indices row col size)))))
+
+
+; --- Generate next world ---
+
+(defn lives?
+  (row col world size)
+  (let (cell       (get-cell world row col)
+        neighbours (num-living-neighbours row col world size))
+      (if cell
+        (or
+          (= neighbours 2)
+          (= neighbours 3))
+        (= neighbours 3))))
+
+(defn next-row
+  (row world size)
+  (map
+    (fn (col) (lives? row col world size))
+    (range 0 size)))
+
+(defn next-world
+  (world size)
+  (map
+    (fn (row) (next-row row world size))
+    (range 0 size)))
+
+(defn print-worlds
+  (world size generations)
+  (if (zero? generations)
+    nil
+    (do
+      (clear)
+      (print-world world)
+      (print-worlds (next-world world size) size (dec generations)))))
+
+(def size 6)
+(print-worlds (random-world size) size 8)
